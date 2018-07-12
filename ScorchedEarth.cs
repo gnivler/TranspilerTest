@@ -1,6 +1,7 @@
 ﻿using BattleTech.Rendering;
 using Harmony;
 using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -26,11 +27,12 @@ namespace TranspilerTest
         }
     }
 
-    [HarmonyPatch(typeof(FootstepManager))]
-    [HarmonyPatch(new[] { typeof(int), typeof(float), typeof(float), typeof(float) })]
+    [HarmonyPatch(typeof(FootstepManager), "ProcessFootsteps")]
+    //  [HarmonyPatch(new Type[] { typeof(int), typeof(float), typeof(float), typeof(float) })]
     public static class Patch
     {
 
+        #region ctor failure
         // .maxstack 8
         // 
         // IL_0000: ldc.i4.s     125 // 0x7d
@@ -50,24 +52,43 @@ namespace TranspilerTest
 
 
         // strategy:  replace the ldc codes with higher numbers.  ldc.i4.s is a byte cast to int32 the rest are floats
+        //  static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        //  {
+        //      var codes = new List<CodeInstruction>(instructions);
+        //      for (int i = 0; i < instructions.Count(); i++)
+        //      {
+        //          if (codes[i].opcode == OpCodes.Ldc_I4_S)
+        //          {
+        //              codes.Remove(codes[i]);
+        //              codes.Add(new CodeInstruction(OpCodes.Ldc_I4, 1000));
+        //          }
+        //
+        //          if (codes[i].opcode == OpCodes.Ldc_I4)
+        //          {
+        //              codes.Remove(codes[i]);
+        //              codes.Add(new CodeInstruction(OpCodes.Ldc_R4, float.MaxValue));
+        //          }
+        //      }
+        //      return codes.AsEnumerable();
+        //  }
+        // strategy:  replace the ldc codes with higher numbers.  ldc.i4.s is a byte cast to int32 the rest are float
+        #endregion    
+
+        // strategy:  intercept calls to get_startTime and replace the callvirt OpCode with an int
+        //            intercept calls to MaxDecals and replace 
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             var codes = new List<CodeInstruction>(instructions);
+
             for (int i = 0; i < instructions.Count(); i++)
             {
-                if (codes[i].opcode == OpCodes.Ldc_I4_S)
+                if (codes[i].operand.ToString().Contains("get_realtimeSinceStartup"))
                 {
-                    codes.Remove(codes[i]);
-                    codes.Add(new CodeInstruction(OpCodes.Ldc_I4, 1000));
+                    codes[i].opcode = OpCodes.Ldc_R4;
+                    codes[i].operand = float.MinValue;
                 }
 
-                if (codes[i].opcode == OpCodes.Ldc_I4)
-                {
-                    codes.Remove(codes[i]);
-                    codes.Add(new CodeInstruction(OpCodes.Ldc_R4, float.MaxValue));
-                }
             }
-            return codes.AsEnumerable();
         }
     }
 }
